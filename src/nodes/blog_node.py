@@ -1,4 +1,14 @@
+import re
 from src.states.blogstate import BlogState
+
+def clean_response(content):
+    """
+    strip reasoning think tags so the response works with both
+    thinking and non thinking models
+    """
+    if not isinstance(content, str):
+        return content
+    return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
 
 class BlogNode:
     """
@@ -21,7 +31,7 @@ class BlogNode:
 
         system_message=prompt.format(topic=state["topic"])
         response=self.llm.invoke(system_message)
-        return {"blog":{"title":response.content}}
+        return {"blog":{"title":clean_response(response.content)}}
 
 
     def content_generation(self,state:BlogState):
@@ -37,5 +47,5 @@ class BlogNode:
 
             system_message = system_prompt.format(topic = state["topic"])
             response = self.llm.invoke(system_message)
-            return {"blog":{"title": state['blog']['title'], "content": response.content}}
+            return {"blog":{"title": state['blog']['title'], "content": clean_response(response.content)}}
 
