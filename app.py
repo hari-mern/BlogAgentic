@@ -1,37 +1,47 @@
+import os
+
 import uvicorn
-from fastapi import FastAPI, Request
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+
+from src.config import SUPPORTED_LANGUAGES
 from src.graphs.graph_builder import GraphBuilder
 from src.llms.groqllm import GroqLLM
 
-import os
-from dotenv import load_dotenv
 load_dotenv()
+os.environ.setdefault("LANGSMITH_API_KEY", os.getenv("LANGCHAIN_API_KEY", ""))
 
-app=FastAPI()
+app = FastAPI(title="BlogAgentic", version="1.0.0")
 
-os.environ['LANGSMITH_API_KEY']=os.getenv('LANGCHAIN_API_KEY')
-
-# API's
 
 @app.post("/blogs")
-async def create_blogs(request:Request):
-    data=await request.json()
-    topic = data.get("topic","")
+async def create_blogs(request: Request):
+    data = await request.json()
+    topic = (data.get("topic") or "").strip()
+    language = (data.get("language") or "").strip().lower()
 
-    ## get the llm object
+    if not topic:
+        raise HTTPException(status_code=400, detail="'topic' is required.")
 
-    groqllm=GroqLLM()
-    llm=groqllm.get_llm()
+    if language and language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported language '{language}'. "
+            f"Supported: {', '.join(sorted(SUPPORTED_LANGUAGES))}.",
+        )
 
-    ## get the graph
+    llm = GroqLLM().get_llm()
     graph_builder = GraphBuilder(llm)
-    if topic:
+
+    if language:
+        graph = graph_builder.setup_graph(usecase="language")
+        state = graph.invoke({"topic": topic, "current_language": language})
+    else:
         graph = graph_builder.setup_graph(usecase="topic")
-        state=graph.invoke({"topic":topic})
-    
-    return {"data":state}
-    
+        state = graph.invoke({"topic": topic})
 
-if __name__=="__main__":
-    uvicorn.run("app:app", host="0.0.0.0",port=8000, reload=True)
+    return {"data": state}
 
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

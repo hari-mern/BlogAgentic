@@ -1,19 +1,22 @@
-from langchain_groq import ChatGroq
 import os
-from dotenv import load_dotenv
+
+from langchain_groq import ChatGroq
+
+from src.config import GROQ_MODEL, GROQ_REASONING_EFFORT
+
 
 class GroqLLM:
-    def __init__(self):
-        load_dotenv()
+    """Factory that builds a configured Groq chat model."""
 
     def get_llm(self):
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY is not set. Add it to the .env file.")
+
         try:
-            os.environ['GROQ_API_KEY']=self.groq_api_key=os.getenv("GROQ_API_KEY")
-            model_name=os.getenv("GROQ_MODEL","qwen/qwen3.6-27b")
-            llm_kwargs={"api_key":self.groq_api_key,"model_name":model_name}
-            if "qwen" in model_name:
-                llm_kwargs["reasoning_effort"]=os.getenv("GROQ_REASONING_EFFORT","none")
-            llm=ChatGroq(**llm_kwargs)
-            return llm
-        except Exception as e:
-            raise ValueError(f"Error occurred with exception : {e}")
+            llm_kwargs = {"api_key": api_key, "model_name": GROQ_MODEL}
+            if "qwen" in GROQ_MODEL:
+                llm_kwargs["reasoning_effort"] = GROQ_REASONING_EFFORT
+            return ChatGroq(**llm_kwargs)
+        except Exception as exc:
+            raise ValueError(f"Failed to initialise Groq LLM: {exc}") from exc
